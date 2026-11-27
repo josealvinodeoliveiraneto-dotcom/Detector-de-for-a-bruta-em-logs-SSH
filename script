@@ -1,0 +1,47 @@
+ssh-bruteforce-detector/
+├── detector.py
+├── sample_auth.log      # log de exemplo (com IPs fictícios)
+├── README.md
+├── requirements.txt     # vazio, só usa a biblioteca padrão
+└── LICENSE              # MIT
+Código (detector.py)
+python
+import re
+import argparse
+from collections import Counter
+
+PATTERN = re.compile(r"Failed password for (?:invalid user )?(\S+) from (\d+\.\d+\.\d+\.\d+)")
+
+def analyze(log_path, threshold):
+    ips = Counter()
+    users = Counter()
+    with open(log_path, "r", errors="ignore") as f:
+        for line in f:
+            match = PATTERN.search(line)
+            if match:
+                user, ip = match.groups()
+                ips[ip] += 1
+                users[user] += 1
+    return ips, users
+
+def main():
+    parser = argparse.ArgumentParser(description="Detecta possíveis ataques de força bruta no SSH")
+    parser.add_argument("logfile", help="Caminho do arquivo de log (ex: /var/log/auth.log)")
+    parser.add_argument("-t", "--threshold", type=int, default=5, help="Mínimo de falhas para alertar")
+    args = parser.parse_args()
+
+    ips, users = analyze(args.logfile, args.threshold)
+
+    print("=== IPs suspeitos ===")
+    for ip, count in ips.most_common():
+        if count >= args.threshold:
+            print(f"[ALERTA] {ip}: {count} tentativas falhas")
+
+    print("\n=== Usuários mais atacados ===")
+    for user, count in users.most_common(5):
+        print(f"{user}: {count}")
+
+if __name__ == "__main__":
+    main()
+
+Uso: python detector.py sample_auth.log -t 3
